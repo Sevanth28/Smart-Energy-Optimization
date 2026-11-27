@@ -86,7 +86,7 @@
         </div>
 
         <span id="headerCityPill" class="rounded-lg border border-slate-700 bg-obsidian-850 px-2.5 py-1 font-mono text-[11px] font-semibold text-emerald-300">
-          Bengaluru
+          Detecting location
         </span>
       </div>
 
@@ -204,31 +204,19 @@
           </span>
         </div>
 
-        <div class="mt-5 flex flex-col gap-2.5 sm:flex-row">
-          <input
-            id="citySearchInput"
-            type="text"
-            value="Bengaluru"
-            placeholder="Enter city name (e.g., Bengaluru, Mumbai, Delhi, Chennai, London)..."
-            onkeydown="if (event.key === 'Enter') fetchEnvironmentData()"
-            class="flex-1 rounded-xl border border-slate-700 bg-obsidian-950 px-4 py-2.5 text-sm font-medium text-white placeholder-slate-500 focus:border-sky-400 focus:outline-none"
-          />
+        <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div class="text-xs text-slate-300">
+            <div class="font-semibold text-white">Device location detection</div>
+            <p id="locationStatus" class="mt-1 text-slate-400">Waiting for browser location permission...</p>
+          </div>
           <button
             id="fetchEnvBtn"
             type="button"
-            onclick="fetchEnvironmentData()"
+            onclick="requestCurrentLocationAndFetch()"
             class="rounded-xl bg-gradient-to-r from-sky-400 to-emerald-400 px-5 py-2.5 text-xs font-extrabold text-slate-950 transition hover:from-sky-300 hover:to-emerald-300 sm:text-sm"
           >
-            Fetch API Data
+            Detect My Location &amp; Fetch
           </button>
-        </div>
-
-        <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
-          <span class="text-slate-400">Cities:</span>
-          <button type="button" onclick="pickCity('Bengaluru', 12.9716, 77.5946)" class="rounded-lg border border-slate-700 bg-obsidian-850 px-2.5 py-1 font-medium text-slate-200 hover:border-sky-500/40 hover:bg-sky-500/10">Bengaluru</button>
-          <button type="button" onclick="pickCity('Mumbai', 19.076, 72.8777)" class="rounded-lg border border-slate-700 bg-obsidian-850 px-2.5 py-1 font-medium text-slate-200 hover:border-sky-500/40 hover:bg-sky-500/10">Mumbai</button>
-          <button type="button" onclick="pickCity('Delhi', 28.6139, 77.209)" class="rounded-lg border border-slate-700 bg-obsidian-850 px-2.5 py-1 font-medium text-slate-200 hover:border-sky-500/40 hover:bg-sky-500/10">Delhi</button>
-          <button type="button" onclick="pickCity('London', 51.5072, -0.1276)" class="rounded-lg border border-slate-700 bg-obsidian-850 px-2.5 py-1 font-medium text-slate-200 hover:border-sky-500/40 hover:bg-sky-500/10">London</button>
         </div>
 
         <!-- Live Environment Telemetry Cards -->
@@ -322,6 +310,8 @@
         </div>
 
         <!-- Visual Comparison Bars -->
+        <p class="mt-3 text-xs leading-relaxed text-amber-200/90">Note: the adjusted values are estimates based on simplified environmental rules. They are not live appliance-meter readings or guaranteed savings. Monthly = 30 days; yearly = 365 days. Electricity tariff is assumed to be ₹8/kWh.</p>
+
         <div class="mt-5 space-y-3 rounded-2xl border border-slate-800 bg-obsidian-950/80 p-4">
           <div>
             <div class="mb-1 flex justify-between text-xs font-semibold text-slate-300">
@@ -351,9 +341,11 @@
               <tr>
                 <th class="px-4 py-3">Device</th>
                 <th class="px-4 py-3">Qty</th>
-                <th class="px-4 py-3">Standard (kWh)</th>
-                <th class="px-4 py-3">Optimized (kWh)</th>
-                <th class="px-4 py-3">Saved (kWh)</th>
+                <th class="px-4 py-3">Power (W)</th>
+                <th class="px-4 py-3">Hours/day</th>
+                <th class="px-4 py-3">Standard (kWh/day)</th>
+                <th class="px-4 py-3">Estimated adjusted (kWh/day)</th>
+                <th class="px-4 py-3">Estimated difference (kWh/day)</th>
               </tr>
             </thead>
             <tbody id="compareTableBody" class="divide-y divide-slate-800/80 bg-obsidian-900/60 font-mono text-xs">
@@ -416,7 +408,7 @@
           <div class="rounded-2xl border border-teal-500/30 bg-obsidian-950/90 p-4">
             <div class="text-[11px] font-bold uppercase tracking-wider text-teal-300">Monthly Energy Saved</div>
             <div id="revealSavedMonthly" class="mt-1.5 font-mono text-2xl font-extrabold text-white">0.0 kWh</div>
-            <div class="mt-1 text-xs text-slate-400">30-day projection</div>
+            <div id="revealSavedYearly" class="mt-1 text-xs text-slate-400">0.0 kWh / year (365-day projection)</div>
           </div>
 
           <div class="rounded-2xl border border-sky-500/30 bg-obsidian-950/90 p-4">
@@ -475,7 +467,7 @@
     const state = {
       view: 'devices',
       quantities: Object.fromEntries(DEVICES.map((d) => [d.id, d.defaultQty])),
-      location: { name: 'Bengaluru', lat: 12.9716, lon: 77.5946 },
+      location: { name: 'Current location', lat: null, lon: null },
       env: {
         tempC: 25.0,
         feelsC: 25.5,
@@ -486,7 +478,7 @@
         aqi: 64,
         rainMm: 0.0,
         soilMoisture: 0.25,
-        source: 'Default Profile',
+        source: 'Waiting for location',
       },
       analysis: null,
     };
@@ -562,15 +554,30 @@
         return `
           <div class="rounded-2xl border ${active ? 'border-emerald-500/40 bg-obsidian-850' : 'border-slate-800 bg-obsidian-950/70 opacity-80'} p-4 transition">
             <div class="flex items-start justify-between gap-2">
-              <div>
+              <div class="min-w-0 flex-1">
                 <h3 class="text-sm font-bold text-white">${d.name}</h3>
-                <p class="mt-0.5 font-mono text-[11px] text-slate-400">${d.watts}W · ${d.hours}h/day</p>
+                <p class="mt-0.5 text-[11px] text-slate-400">Edit the appliance's rated power and typical daily use.</p>
               </div>
               <span class="rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${active ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-slate-800 text-slate-400'}">
                 ${active ? 'Selected' : '0'}
               </span>
             </div>
-            <p class="mt-2 text-[11px] text-sky-300/90">Uses: ${d.factor}</p>
+            <p class="mt-2 text-[11px] text-sky-300/90">Environment factor: ${d.factor}</p>
+
+            <div class="mt-3 grid grid-cols-2 gap-2">
+              <label class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                Rated power (W)
+                <input type="number" min="1" max="10000" step="1" value="${d.watts}"
+                  onchange="setDeviceSpec('${d.id}', 'watts', this.value)"
+                  class="mt-1 w-full rounded-lg border border-slate-700 bg-obsidian-950 px-2 py-2 font-mono text-sm text-white focus:border-emerald-400 focus:outline-none" />
+              </label>
+              <label class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                Hours per day
+                <input type="number" min="0" max="24" step="0.5" value="${d.hours}"
+                  onchange="setDeviceSpec('${d.id}', 'hours', this.value)"
+                  class="mt-1 w-full rounded-lg border border-slate-700 bg-obsidian-950 px-2 py-2 font-mono text-sm text-white focus:border-emerald-400 focus:outline-none" />
+              </label>
+            </div>
 
             <div class="mt-4 flex items-center justify-between border-t border-slate-800 pt-3">
               <div class="flex items-center gap-2">
@@ -598,6 +605,56 @@
           </div>
         `;
       }).join('');
+    }
+
+    // Save user-edited appliance ratings and daily usage in this browser.
+    // These settings are separate from Firestore appliance quantities.
+    const DEVICE_SETTINGS_KEY = 'energyOptimizerDeviceSettings';
+
+    function saveDeviceSettings() {
+      const settings = Object.fromEntries(
+        DEVICES.map(d => [d.id, { watts: d.watts, hours: d.hours }])
+      );
+      localStorage.setItem(DEVICE_SETTINGS_KEY, JSON.stringify(settings));
+    }
+
+    function loadDeviceSettings() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(DEVICE_SETTINGS_KEY) || '{}');
+        DEVICES.forEach(d => {
+          const item = saved[d.id];
+          if (!item) return;
+          const watts = Number(item.watts);
+          const hours = Number(item.hours);
+          if (Number.isFinite(watts) && watts >= 1 && watts <= 10000) d.watts = watts;
+          if (Number.isFinite(hours) && hours >= 0 && hours <= 24) d.hours = hours;
+        });
+      } catch (error) {
+        console.warn('Could not load saved appliance settings:', error);
+      }
+    }
+
+    function setDeviceSpec(id, field, value) {
+      const device = DEVICES.find(d => d.id === id);
+      if (!device || !['watts', 'hours'].includes(field)) return;
+
+      const number = Number(value);
+      const valid = Number.isFinite(number) &&
+        (field === 'watts' ? number >= 1 && number <= 10000 : number >= 0 && number <= 24);
+
+      if (!valid) {
+        showStatus(field === 'watts'
+          ? 'Enter a power rating between 1 and 10000 watts.'
+          : 'Enter daily usage between 0 and 24 hours.', true);
+        renderDeviceCards();
+        return;
+      }
+
+      device[field] = number;
+      saveDeviceSettings();
+      renderDeviceCards();
+      recomputeComparison();
+      showStatus(`${device.name}: ${field === 'watts' ? 'power rating' : 'daily usage'} updated.`);
     }
 
     function adjustQty(id, delta) {
@@ -636,23 +693,78 @@
       const e = state.env;
       document.getElementById('headerCityPill').textContent = state.location.name;
       document.getElementById('envSourceBadge').textContent = e.source;
-      document.getElementById('envTempVal').textContent = `${e.tempC.toFixed(1)} °C`;
-      document.getElementById('envFeelsVal').textContent = `Feels like ${e.feelsC.toFixed(1)} °C`;
+      document.getElementById('envTempVal').textContent = `${Number(e.tempC).toFixed(1)} °C`;
+      document.getElementById('envFeelsVal').textContent = `Feels like ${Number(e.feelsC).toFixed(1)} °C`;
       document.getElementById('envHumidityVal').textContent = `${Math.round(e.humidity)}%`;
       document.getElementById('envSolarVal').textContent = `${Math.round(e.solarWm2)} W/m²`;
       document.getElementById('envDaylightVal').textContent = e.isDay ? 'Daylight active' : 'Night / low sun';
       document.getElementById('envAqiVal').textContent = `${e.aqi} AQI`;
-      document.getElementById('envPmVal').textContent = `PM2.5: ${e.pm25.toFixed(1)} µg/m³`;
+      document.getElementById('envPmVal').textContent = `PM2.5: ${Number(e.pm25).toFixed(1)} µg/m³`;
     }
 
-    async function pickCity(name, lat, lon) {
-      state.location = { name, lat, lon };
-      document.getElementById('citySearchInput').value = name;
-      await fetchEnvironmentData();
+    function getBrowserLocation() {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error('This browser does not support location detection.'));
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          position => resolve({
+            lat: position.coords.latitude,
+            lon: position.coords.longitude
+          }),
+          error => {
+            const messages = {
+              1: 'Location permission was denied. Allow location access in your browser and try again.',
+              2: 'Your current location is unavailable. Check your device location settings.',
+              3: 'Location detection timed out. Please try again.'
+            };
+            reject(new Error(messages[error.code] || 'Could not detect your location.'));
+          },
+          { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }
+        );
+      });
+    }
+
+    async function requestCurrentLocationAndFetch() {
+      const btn = document.getElementById('fetchEnvBtn');
+      const locationStatus = document.getElementById('locationStatus');
+
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Detecting location...';
+      }
+      if (locationStatus) locationStatus.textContent = 'Requesting your device location...';
+
+      try {
+        const coords = await getBrowserLocation();
+        state.location = {
+          name: `Current location (${coords.lat.toFixed(3)}, ${coords.lon.toFixed(3)})`,
+          lat: coords.lat,
+          lon: coords.lon
+        };
+        if (locationStatus) {
+          locationStatus.textContent = `Location detected: ${coords.lat.toFixed(4)}, ${coords.lon.toFixed(4)}`;
+        }
+        await fetchEnvironmentData();
+      } catch (error) {
+        console.error('Location error:', error);
+        if (locationStatus) locationStatus.textContent = error.message;
+        showStatus(error.message, true);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Detect My Location & Fetch';
+        }
+      }
     }
 
     async function fetchEnvironmentData() {
-      const rawCity = (document.getElementById('citySearchInput')?.value || state.location.name).trim();
+      if (!Number.isFinite(state.location.lat) || !Number.isFinite(state.location.lon)) {
+        return requestCurrentLocationAndFetch();
+      }
+
       const btn = document.getElementById('fetchEnvBtn');
       if (btn) {
         btn.disabled = true;
@@ -660,64 +772,41 @@
       }
 
       try {
-        let { name, lat, lon } = state.location;
-        if (rawCity && rawCity.toLowerCase() !== name.toLowerCase()) {
-          const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(rawCity)}&count=1&format=json`);
-          if (geoRes.ok) {
-            const geoJson = await geoRes.json();
-            if (geoJson.results && geoJson.results.length > 0) {
-              const hit = geoJson.results[0];
-              name = hit.name;
-              lat = hit.latitude;
-              lon = hit.longitude;
-              state.location = { name, lat, lon };
-            }
-          }
-        }
+        const params = new URLSearchParams({
+          latitude: String(state.location.lat),
+          longitude: String(state.location.lon)
+        });
+        const response = await fetch(`/api/environment?${params.toString()}`);
+        const result = await response.json();
 
-        const wxUrl =
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-          `&current=temperature_2m,apparent_temperature,relative_humidity_2m,shortwave_radiation,is_day,precipitation,soil_moisture_0_to_1cm&timezone=auto`;
-        const aqUrl =
-          `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}` +
-          `&current=pm2_5&timezone=auto`;
-
-        const [wxRes, aqRes] = await Promise.all([fetch(wxUrl), fetch(aqUrl)]);
-        if (!wxRes.ok) throw new Error('Weather API failed');
-        const wxJson = await wxRes.json();
-        const cur = wxJson.current || {};
-
-        let pm25 = 18.0;
-        if (aqRes.ok) {
-          const aqJson = await aqRes.json();
-          if (aqJson.current?.pm2_5 != null) {
-            pm25 = Number(aqJson.current.pm2_5);
-          }
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || `Environment API failed (HTTP ${response.status})`);
         }
 
         state.env = {
-          tempC: Number(cur.temperature_2m ?? 25),
-          feelsC: Number(cur.apparent_temperature ?? cur.temperature_2m ?? 25),
-          humidity: Number(cur.relative_humidity_2m ?? 60),
-          solarWm2: Number(cur.shortwave_radiation ?? 0),
-          isDay: Boolean(cur.is_day),
-          pm25,
-          aqi: pm25ToAqi(pm25),
-          rainMm: Number(cur.precipitation ?? 0),
-          soilMoisture: Number(cur.soil_moisture_0_to_1cm ?? 0.25),
-          source: 'Open-Meteo Live API',
+          tempC: Number(result.temperature),
+          feelsC: Number(result.feelsLike),
+          humidity: Number(result.humidity),
+          solarWm2: Number(result.solarRadiation),
+          isDay: Boolean(result.isDay),
+          pm25: Number(result.pm25),
+          aqi: Number(result.aqi),
+          rainMm: Number(result.precipitation || 0),
+          soilMoisture: Number(result.soilMoisture ?? 0.25),
+          source: 'Open-Meteo Live API'
         };
 
         renderEnvironmentCards();
-        showStatus(`Fetched live environmental data for ${state.location.name}.`);
-      } catch (err) {
-        state.env.source = 'Fallback Estimate';
-        renderEnvironmentCards();
-        showStatus(`Could not reach external API (${err.message}). Showing fallback environmental values.`, true);
+        recomputeComparison();
+        const updatedAt = result.updatedAt ? new Date(result.updatedAt).toLocaleTimeString() : '';
+        showStatus(`Environmental readings updated for your current location${updatedAt ? ` at ${updatedAt}` : ''}.`);
+      } catch (error) {
+        console.error('Environment fetch error:', error);
+        showStatus(`Could not fetch environmental data: ${error.message}`, true);
       } finally {
         if (btn) {
           btn.disabled = false;
-          btn.textContent = 'Fetch API Data';
+          btn.textContent = 'Detect My Location & Fetch';
         }
       }
     }
@@ -825,8 +914,12 @@
         stdMonthly: stdDaily * 30,
         optMonthly: optDaily * 30,
         savedMonthly: savedDaily * 30,
+        savedYearly: savedDaily * 365,
+        stdYearly: stdDaily * 365,
+        optYearly: optDaily * 365,
         savedCostDaily: savedDaily * tariff,
         savedCostMonthly: savedDaily * 30 * tariff,
+        savedCostYearly: savedDaily * 365 * tariff,
         savedCo2Daily: savedDaily * co2KgPerKwh,
         savedCo2Monthly: savedDaily * 30 * co2KgPerKwh,
       };
@@ -836,6 +929,11 @@
     }
 
     function runAnalysisAndGoCompare() {
+      if (state.env.source !== 'Open-Meteo Live API') {
+        showStatus('Please allow location access and fetch environmental readings before running the analysis.', true);
+        switchView('environment');
+        return;
+      }
       recomputeComparison();
       switchView('compare');
     }
@@ -850,7 +948,7 @@
       document.getElementById('optMonthlyKwh').textContent = `${a.optMonthly.toFixed(1)} kWh / month`;
       document.getElementById('savedDailyKwh').textContent = `${a.savedDaily.toFixed(2)} kWh`;
       document.getElementById('savingsPctBadge').textContent = `${a.savingsPct.toFixed(1)}%`;
-      document.getElementById('savedCostEst').textContent = `₹${a.savedCostDaily.toFixed(2)} saved / day (@ ₹8/kWh)`;
+      document.getElementById('savedCostEst').textContent = `Estimated difference: ₹${a.savedCostDaily.toFixed(2)} / day (@ ₹8/kWh)`;
 
       const optWidth = a.stdDaily > 0 ? Math.max(0, Math.min(100, (a.optDaily / a.stdDaily) * 100)) : 0;
       document.getElementById('stdBarText').textContent = `${a.stdDaily.toFixed(2)} kWh`;
@@ -865,9 +963,11 @@
           <tr class="${r.qty === 0 ? 'opacity-50' : ''}">
             <td class="px-4 py-3 font-sans font-bold text-white">${r.name}</td>
             <td class="px-4 py-3 text-slate-300">${r.qty}</td>
-            <td class="px-4 py-3 text-slate-300">${r.standardKwh.toFixed(2)}</td>
-            <td class="px-4 py-3 text-emerald-300">${r.optimizedKwh.toFixed(2)}</td>
-            <td class="px-4 py-3 font-bold text-emerald-400">-${r.savedKwh.toFixed(2)}</td>
+            <td class="px-4 py-3 text-slate-300">${r.watts}</td>
+            <td class="px-4 py-3 text-slate-300">${r.hours}</td>
+            <td class="px-4 py-3 text-slate-300">${r.standardKwh.toFixed(3)}</td>
+            <td class="px-4 py-3 text-emerald-300">${r.optimizedKwh.toFixed(3)}</td>
+            <td class="px-4 py-3 font-bold text-emerald-400">${r.savedKwh.toFixed(3)}</td>
           </tr>
         `
         )
@@ -876,11 +976,13 @@
 
     function renderRevealView(a) {
       document.getElementById('revealHeadline').textContent =
-        `For ${state.location.name} (${state.env.source}) — Standard ${a.stdDaily.toFixed(2)} kWh/day reduced to Optimal ${a.optDaily.toFixed(2)} kWh/day.`;
+        `For ${state.location.name} (${state.env.source}) — baseline ${a.stdDaily.toFixed(2)} kWh/day; model-adjusted estimate ${a.optDaily.toFixed(2)} kWh/day. These are estimates, not measured savings.`;
       document.getElementById('revealSavedDaily').textContent = `${a.savedDaily.toFixed(2)} kWh`;
       document.getElementById('revealSavedPct').textContent = `${a.savingsPct.toFixed(1)}% below standard`;
       document.getElementById('revealSavedMonthly').textContent = `${a.savedMonthly.toFixed(1)} kWh`;
+      document.getElementById('revealSavedYearly').textContent = `${a.savedYearly.toFixed(1)} kWh / year (365-day projection)`;
       document.getElementById('revealBillMonthly').textContent = `₹${a.savedCostMonthly.toFixed(0)}`;
+      document.getElementById('revealBillMonthly').title = `Estimated yearly difference: ₹${a.savedCostYearly.toFixed(0)}`;
       document.getElementById('revealBillDaily').textContent = `₹${a.savedCostDaily.toFixed(2)} / day`;
       document.getElementById('revealCo2Monthly').textContent = `${a.savedCo2Monthly.toFixed(1)} kg`;
       document.getElementById('revealCo2Daily').textContent = `${a.savedCo2Daily.toFixed(2)} kg / day`;
@@ -1020,11 +1122,28 @@ async function loadDeviceSelections() {
 
 // Initialize the page after saved quantities have been loaded.
 window.addEventListener("DOMContentLoaded", async () => {
+    loadDeviceSettings();
     await loadDeviceSelections();
     renderDeviceCards();
-    renderEnvironmentCards();
-    recomputeComparison();
-    fetchEnvironmentData();
+
+    // GPS works on localhost and on HTTPS websites.
+    // Ask permission, then fetch environmental readings for the detected coordinates.
+    await requestCurrentLocationAndFetch();
+
+    // Refresh the readings every 10 minutes using the device's latest location.
+    window.setInterval(async () => {
+        try {
+            const coords = await getBrowserLocation();
+            state.location = {
+                name: `Current location (${coords.lat.toFixed(3)}, ${coords.lon.toFixed(3)})`,
+                lat: coords.lat,
+                lon: coords.lon
+            };
+            await fetchEnvironmentData();
+        } catch (error) {
+            console.warn('Automatic location refresh skipped:', error.message);
+        }
+    }, 10 * 60 * 1000);
 });
 
   </script>
