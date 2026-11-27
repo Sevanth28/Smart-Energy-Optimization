@@ -121,6 +121,12 @@ http://localhost:3000
 
 Allow location access when prompted to retrieve environmental information for your current location.
 
+
+## Application Screenshots
+
+## Dashboard
+![Dashboard](screenshots/dashboard.png)
+
 ## API Endpoints
 
 | Method | Endpoint | Purpose |
