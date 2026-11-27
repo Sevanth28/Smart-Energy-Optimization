@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartApplianceEnergyOptimizer — Multi-Stage Optimizer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+          },
+          colors: {
+            obsidian: {
+              950: '#070b12',
+              900: '#0d1420',
+              850: '#121b2b',
+              800: '#182338',
+            },
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    body {
+      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+      background-color: #070b12;
+      color: #f1f5f9;
+    }
+    .font-mono, .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0d1420;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #25334d;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #364a6e;
+    }
+    .tab-active {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #04100b;
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.28);
+      border: 1px solid rgba(52, 211, 153, 0.65);
+    }
+    .tab-idle {
+      background-color: #121b2b;
+      color: #cbd5e1;
+      border: 1px solid #1e2d48;
+    }
+    .tab-idle:hover {
+      background-color: #182338;
+      color: #ffffff;
+      border-color: #334b75;
+    }
+  </style>
+</head>
+<body class="dark min-h-screen bg-obsidian-950 text-slate-100 antialiased selection:bg-emerald-500/30 selection:text-emerald-200">
+
+  <!-- Sticky Header with 4 Main Tabs -->
+  <header class="sticky top-0 z-30 border-b border-slate-800/90 bg-obsidian-900/90 backdrop-blur-xl">
+    <div class="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3.5 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 text-slate-950 shadow-lg shadow-emerald-500/20">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-sm font-extrabold tracking-tight text-white sm:text-base">SmartApplianceEnergyOptimizer</h1>
+            <p class="text-[11px] text-slate-400">4-Tab Workflow + 5th Analysis Reveal</p>
+          </div>
+        </div>
+
+        <span id="headerCityPill" class="rounded-lg border border-slate-700 bg-obsidian-850 px-2.5 py-1 font-mono text-[11px] font-semibold text-emerald-300">
+          Bengaluru
+        </span>
+      </div>
+
+      <!-- Exactly 4 Main Navigation Tabs -->
+      <nav aria-label="Main Workflow Tabs" class="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+        <button
+          id="tab-devices"
+          type="button"
+          onclick="switchView('devices')"
+          class="tab-active shrink-0 rounded-xl px-3.5 py-2 text-xs font-bold transition sm:text-sm"
+        >
+          1. Select Devices
+        </button>
+        <button
+          id="tab-environment"
+          type="button"
+          onclick="switchView('environment')"
+          class="tab-idle shrink-0 rounded-xl px-3.5 py-2 text-xs font-bold transition sm:text-sm"
+        >
+          2. Environment &amp; API
+        </button>
+        <button
+          id="tab-compare"
+          type="button"
+          onclick="switchView('compare')"
+          class="tab-idle shrink-0 rounded-xl px-3.5 py-2 text-xs font-bold transition sm:text-sm"
+        >
+          3. Analyze &amp; Compare
+        </button>
+        <button
+          id="tab-reveal"
+          type="button"
+          onclick="switchView('reveal')"
+          class="tab-idle shrink-0 rounded-xl px-3.5 py-2 text-xs font-bold transition sm:text-sm"
+        >
+          4. Reveal Analysis
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-6xl space-y-6 px-4 py-7 sm:px-6 lg:px-8">
+
+    <!-- Non-blocking Status Bar -->
+    <div id="statusBar" class="hidden items-center justify-between gap-3 rounded-2xl border border-slate-700 bg-obsidian-850 px-4 py-3 text-xs font-medium text-slate-100 sm:text-sm">
+      <div class="flex items-center gap-2.5">
+        <span id="statusDot" class="h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-400"></span>
+        <span id="statusText">Ready</span>
+      </div>
+      <button type="button" onclick="hideStatus()" class="rounded-lg px-2 py-1 text-xs font-semibold text-slate-400 hover:bg-obsidian-800 hover:text-white">
+        Dismiss
+      </button>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 1: SELECT DEVICES                                                 -->
+    <!-- ===================================================================== -->
+    <section id="view-devices" class="space-y-6">
+      <div class="rounded-2xl border border-slate-800 bg-obsidian-900 p-6 shadow-xl shadow-black/30">
+        <div class="flex flex-col justify-between gap-3 border-b border-slate-800 pb-4 sm:flex-row sm:items-center">
+          <div>
+            <span class="font-mono text-xs font-bold uppercase tracking-wider text-emerald-400">Step 1 of 4</span>
+            <h2 class="mt-0.5 text-xl font-extrabold text-white">Select Devices &amp; Quantities</h2>
+            <p class="text-xs text-slate-400">Choose how many appliances you have (0 = none). All calculations use these exact counts.</p>
+          </div>
+          <div class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2 font-mono text-xs font-bold text-emerald-300">
+            Active Units: <span id="totalUnitsCount">0</span>
+          </div>
+        </div>
+
+        <div id="deviceCardsGrid" class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <!-- Rendered by JS -->
+        </div>
+
+        <div class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 pt-5">
+          <button
+            type="button"
+            onclick="resetDeviceQuantities()"
+            class="rounded-xl border border-slate-700 bg-obsidian-850 px-4 py-2.5 text-xs font-semibold text-slate-300 transition hover:bg-obsidian-800 hover:text-white"
+          >
+            Reset Quantities
+          </button>
+          <button
+  type="button"
+  onclick="saveDeviceSelections()"
+  class="rounded-xl bg-sky-500 px-4 py-2.5 text-xs
+         font-extrabold text-slate-950 hover:bg-sky-400"
+>
+  Save Selections
+</button>
+          <button
+            type="button"
+            onclick="switchView('environment')"
+            class="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-xs font-extrabold text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:from-emerald-400 hover:to-teal-400 sm:text-sm"
+          >
+            Next: Environment &amp; API →
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 2: ENVIRONMENT & API                                              -->
+    <!-- ===================================================================== -->
+    <section id="view-environment" class="hidden space-y-6">
+      <div class="rounded-2xl border border-slate-800 bg-obsidian-900 p-6 shadow-xl shadow-black/30">
+        <div class="flex flex-col justify-between gap-3 border-b border-slate-800 pb-4 sm:flex-row sm:items-center">
+          <div>
+            <span class="font-mono text-xs font-bold uppercase tracking-wider text-sky-400">Step 2 of 4</span>
+            <h2 class="mt-0.5 text-xl font-extrabold text-white">Environment &amp; External API Data</h2>
+            <p class="text-xs text-slate-400">Fetches live temperature, humidity, sunlight (solar radiation), and air quality (PM2.5 / AQI) via Open-Meteo</p>
+          </div>
+          <span id="envSourceBadge" class="rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-1.5 font-mono text-xs font-semibold text-sky-300">
+            Open-Meteo Live
+          </span>
+        </div>
+
+        <div class="mt-5 flex flex-col gap-2.5 sm:flex-row">
+          <input
+            id="citySearchInput"
+            type="text"
+            value="Bengaluru"
+            placeholder="Enter city name (e.g., Bengaluru, Mumbai, Delhi, Chennai, London)..."
+            onkeydown="if (event.key === 'Enter') fetchEnvironmentData()"
+            class="flex-1 rounded-xl border border-slate-700 bg-obsidian-950 px-4 py-2.5 text-sm font-medium text-white placeholder-slate-500 focus:border-sky-400 focus:outline-none"
+          />
+          <button
+            id="fetchEnvBtn"
+            type="button"
+            onclick="fetchEnvironmentData()"
+            class="rounded-xl bg-gradient-to-r from-sky-400 to-emerald-400 px-5 py-2.5 text-xs font-extrabold text-slate-950 transition hover:from-sky-300 hover:to-emerald-300 sm:text-sm"
+          >
+            Fetch API Data
+          </button>
+        </div>
+
+        <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
+          <span class="text-slate-400">Cities:</span>
+          <button type="button" onclick="pickCity('Bengaluru', 12.9716, 77.5946)" class="rounded-lg border border-slate-700 bg-obsidian-850 px-2.5 py-1 font-medium text-slate-200 hover:border-sky-500/40 hover:bg-sky-500/10">Bengaluru</button>
+          <button type="button" onclick="pickCity('Mumbai', 19.076, 72.8777)" class="rounded-lg border border-slate-700 bg-obsidian-850 px-2.5 py-1 font-medium text-slate-200 hover:border-sky-500/40 hover:bg-sky-500/10">Mumbai</button>
+          <button type="button" onclick="pickCity('Delhi', 28.6139, 77.209)" class="rounded-lg border border-slate-700 bg-obsidian-850 px-2.5 py-1 font-medium text-slate-200 hover:border-sky-500/40 hover:bg-sky-500/10">Delhi</button>
+          <button type="button" onclick="pickCity('London', 51.5072, -0.1276)" class="rounded-lg border border-slate-700 bg-obsidian-850 px-2.5 py-1 font-medium text-slate-200 hover:border-sky-500/40 hover:bg-sky-500/10">London</button>
+        </div>
+
+        <!-- Live Environment Telemetry Cards -->
+        <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div class="rounded-2xl border border-amber-500/30 bg-obsidian-850 p-4">
+            <div class="text-[11px] font-bold uppercase tracking-wider text-amber-300">Temperature</div>
+            <div id="envTempVal" class="mt-1.5 font-mono text-2xl font-extrabold text-white">-- °C</div>
+            <div id="envFeelsVal" class="mt-1 text-xs text-slate-400">Feels like -- °C</div>
+          </div>
+
+          <div class="rounded-2xl border border-sky-500/30 bg-obsidian-850 p-4">
+            <div class="text-[11px] font-bold uppercase tracking-wider text-sky-300">Humidity</div>
+            <div id="envHumidityVal" class="mt-1.5 font-mono text-2xl font-extrabold text-white">--%</div>
+            <div class="mt-1 text-xs text-slate-400">Relative humidity</div>
+          </div>
+
+          <div class="rounded-2xl border border-yellow-400/30 bg-obsidian-850 p-4">
+            <div class="text-[11px] font-bold uppercase tracking-wider text-yellow-300">Sunlight (Solar)</div>
+            <div id="envSolarVal" class="mt-1.5 font-mono text-2xl font-extrabold text-white">-- W/m²</div>
+            <div id="envDaylightVal" class="mt-1 text-xs text-slate-400">Daylight status</div>
+          </div>
+
+          <div class="rounded-2xl border border-purple-500/30 bg-obsidian-850 p-4">
+            <div class="text-[11px] font-bold uppercase tracking-wider text-purple-300">Air Quality (AQI)</div>
+            <div id="envAqiVal" class="mt-1.5 font-mono text-2xl font-extrabold text-white">-- AQI</div>
+            <div id="envPmVal" class="mt-1 text-xs text-slate-400">PM2.5: -- µg/m³</div>
+          </div>
+        </div>
+
+        <div class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 pt-5">
+          <button
+            type="button"
+            onclick="switchView('devices')"
+            class="rounded-xl border border-slate-700 bg-obsidian-850 px-4 py-2.5 text-xs font-semibold text-slate-300 transition hover:bg-obsidian-800 hover:text-white"
+          >
+            ← Back: Select Devices
+          </button>
+          <button
+            type="button"
+            onclick="runAnalysisAndGoCompare()"
+            class="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-xs font-extrabold text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:from-emerald-400 hover:to-teal-400 sm:text-sm"
+          >
+            Next: Analyze &amp; Compare →
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 3: ANALYZE & COMPARE WITH STANDARD VALUE                          -->
+    <!-- ===================================================================== -->
+    <section id="view-compare" class="hidden space-y-6">
+      <div class="rounded-2xl border border-slate-800 bg-obsidian-900 p-6 shadow-xl shadow-black/30">
+        <div class="flex flex-col justify-between gap-3 border-b border-slate-800 pb-4 sm:flex-row sm:items-center">
+          <div>
+            <span class="font-mono text-xs font-bold uppercase tracking-wider text-teal-400">Step 3 of 4</span>
+            <h2 class="mt-0.5 text-xl font-extrabold text-white">Analyze &amp; Compare with Standard Value</h2>
+            <p id="compareContextLine" class="text-xs text-slate-400">Standard (unoptimized baseline) vs. Environment-Optimized energy draw</p>
+          </div>
+          <button
+            type="button"
+            onclick="recomputeComparison()"
+            class="rounded-xl border border-slate-700 bg-obsidian-850 px-3.5 py-2 text-xs font-semibold text-emerald-300 transition hover:bg-obsidian-800"
+          >
+            Recalculate Now
+          </button>
+        </div>
+
+        <!-- Comparison Summary Cards -->
+        <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div class="rounded-2xl border border-slate-700/80 bg-obsidian-850 p-5">
+            <div class="text-xs font-bold uppercase tracking-wider text-slate-400">Standard Value (Baseline)</div>
+            <div id="stdDailyKwh" class="mt-2 font-mono text-3xl font-extrabold text-white">0.00 kWh</div>
+            <div id="stdMonthlyKwh" class="mt-1 font-mono text-xs text-slate-400">0.0 kWh / month</div>
+          </div>
+
+          <div class="rounded-2xl border border-emerald-500/35 bg-obsidian-850 p-5">
+            <div class="text-xs font-bold uppercase tracking-wider text-emerald-300">Optimized Value</div>
+            <div id="optDailyKwh" class="mt-2 font-mono text-3xl font-extrabold text-emerald-300">0.00 kWh</div>
+            <div id="optMonthlyKwh" class="mt-1 font-mono text-xs text-emerald-200/75">0.0 kWh / month</div>
+          </div>
+
+          <div class="rounded-2xl border border-teal-500/35 bg-obsidian-850 p-5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-teal-300">Net Savings</span>
+              <span id="savingsPctBadge" class="rounded-full bg-emerald-400 px-2.5 py-0.5 font-mono text-xs font-extrabold text-slate-950">0.0%</span>
+            </div>
+            <div id="savedDailyKwh" class="mt-2 font-mono text-3xl font-extrabold text-white">0.00 kWh</div>
+            <div id="savedCostEst" class="mt-1 font-mono text-xs text-teal-200/80">₹0.00 saved / day (@ ₹8/kWh)</div>
+          </div>
+        </div>
+
+        <!-- Visual Comparison Bars -->
+        <div class="mt-5 space-y-3 rounded-2xl border border-slate-800 bg-obsidian-950/80 p-4">
+          <div>
+            <div class="mb-1 flex justify-between text-xs font-semibold text-slate-300">
+              <span>Standard Baseline</span>
+              <span id="stdBarText" class="font-mono">0.00 kWh</span>
+            </div>
+            <div class="h-3 w-full overflow-hidden rounded-full bg-slate-800">
+              <div id="stdBarFill" class="h-full rounded-full bg-slate-400 transition-all duration-300" style="width: 100%"></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="mb-1 flex justify-between text-xs font-semibold text-emerald-300">
+              <span>Environment-Optimized</span>
+              <span id="optBarText" class="font-mono">0.00 kWh</span>
+            </div>
+            <div class="h-3 w-full overflow-hidden rounded-full bg-emerald-950">
+              <div id="optBarFill" class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-300" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Per-Device Comparison Table -->
+        <div class="mt-5 overflow-x-auto rounded-xl border border-slate-800">
+          <table class="min-w-full divide-y divide-slate-800 text-left text-xs sm:text-sm">
+            <thead class="bg-obsidian-950 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              <tr>
+                <th class="px-4 py-3">Device</th>
+                <th class="px-4 py-3">Qty</th>
+                <th class="px-4 py-3">Standard (kWh)</th>
+                <th class="px-4 py-3">Optimized (kWh)</th>
+                <th class="px-4 py-3">Saved (kWh)</th>
+              </tr>
+            </thead>
+            <tbody id="compareTableBody" class="divide-y divide-slate-800/80 bg-obsidian-900/60 font-mono text-xs">
+              <!-- Rendered by JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 pt-5">
+          <button
+            type="button"
+            onclick="switchView('environment')"
+            class="rounded-xl border border-slate-700 bg-obsidian-850 px-4 py-2.5 text-xs font-semibold text-slate-300 transition hover:bg-obsidian-800 hover:text-white"
+          >
+            ← Back: Environment &amp; API
+          </button>
+          <button
+            type="button"
+            onclick="openFifthRevealInterface()"
+            class="rounded-xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 px-6 py-2.5 text-xs font-extrabold text-slate-950 shadow-lg shadow-emerald-500/25 transition hover:brightness-105 sm:text-sm"
+          >
+            Reveal Full Analysis (5th Interface) →
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 4: REVEAL ANALYSIS (ALSO SERVES AS THE 5TH ANALYSIS REVEAL VIEW) -->
+    <!-- ===================================================================== -->
+    <section id="view-reveal" class="hidden space-y-6">
+      <div class="rounded-2xl border border-emerald-500/35 bg-gradient-to-br from-obsidian-900 via-obsidian-850 to-obsidian-950 p-6 shadow-2xl shadow-black/40">
+        <div class="flex flex-col justify-between gap-3 border-b border-slate-800 pb-4 sm:flex-row sm:items-center">
+          <div>
+            <span class="rounded-md border border-emerald-500/35 bg-emerald-500/15 px-2.5 py-1 font-mono text-xs font-bold uppercase tracking-wider text-emerald-300">
+              Final Analysis Reveal
+            </span>
+            <h2 class="mt-2 text-2xl font-extrabold tracking-tight text-white">Energy Optimization Analysis Reveal</h2>
+            <p id="revealHeadline" class="mt-1 text-xs text-slate-300 sm:text-sm">
+              Complete environmental impact &amp; appliance-by-appliance savings breakdown
+            </p>
+          </div>
+          <button
+            type="button"
+            onclick="switchView('compare')"
+            class="rounded-xl border border-slate-700 bg-obsidian-850 px-3.5 py-2 text-xs font-semibold text-slate-200 transition hover:bg-obsidian-800"
+          >
+            ← Back to Compare
+          </button>
+        </div>
+
+        <!-- Headline Reveal Metrics -->
+        <div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div class="rounded-2xl border border-emerald-500/30 bg-obsidian-950/90 p-4">
+            <div class="text-[11px] font-bold uppercase tracking-wider text-emerald-300">Daily Energy Saved</div>
+            <div id="revealSavedDaily" class="mt-1.5 font-mono text-2xl font-extrabold text-white">0.00 kWh</div>
+            <div id="revealSavedPct" class="mt-1 font-mono text-xs text-emerald-300">0.0% below standard</div>
+          </div>
+
+          <div class="rounded-2xl border border-teal-500/30 bg-obsidian-950/90 p-4">
+            <div class="text-[11px] font-bold uppercase tracking-wider text-teal-300">Monthly Energy Saved</div>
+            <div id="revealSavedMonthly" class="mt-1.5 font-mono text-2xl font-extrabold text-white">0.0 kWh</div>
+            <div class="mt-1 text-xs text-slate-400">30-day projection</div>
+          </div>
+
+          <div class="rounded-2xl border border-sky-500/30 bg-obsidian-950/90 p-4">
+            <div class="text-[11px] font-bold uppercase tracking-wider text-sky-300">Estimated Bill Savings</div>
+            <div id="revealBillMonthly" class="mt-1.5 font-mono text-2xl font-extrabold text-white">₹0</div>
+            <div id="revealBillDaily" class="mt-1 font-mono text-xs text-sky-300">₹0.00 / day</div>
+          </div>
+
+          <div class="rounded-2xl border border-purple-500/30 bg-obsidian-950/90 p-4">
+            <div class="text-[11px] font-bold uppercase tracking-wider text-purple-300">CO₂ Avoided</div>
+            <div id="revealCo2Monthly" class="mt-1.5 font-mono text-2xl font-extrabold text-white">0.0 kg</div>
+            <div id="revealCo2Daily" class="mt-1 font-mono text-xs text-purple-300">0.00 kg / day</div>
+          </div>
+        </div>
+
+        <!-- Detailed Reveal Insights Cards -->
+        <div id="revealInsightsList" class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <!-- Rendered by JS -->
+        </div>
+
+        <div class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 pt-5">
+          <button
+            type="button"
+            onclick="switchView('devices')"
+            class="rounded-xl border border-slate-700 bg-obsidian-850 px-4 py-2.5 text-xs font-semibold text-slate-200 transition hover:bg-obsidian-800"
+          >
+            Start New Setup (Select Devices)
+          </button>
+          <button
+            type="button"
+            onclick="switchView('compare')"
+            class="rounded-xl bg-emerald-500 px-4 py-2.5 text-xs font-extrabold text-slate-950 transition hover:bg-emerald-400"
+          >
+            Back to Standard Comparison
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // =========================================================================
+    // STATE & APPLIANCE DEFINITIONS
+    // =========================================================================
+    const DEVICES = [
+      { id: 'fan', name: 'Ceiling Fans', watts: 70, hours: 10, defaultQty: 3, factor: 'Temperature & Humidity' },
+      { id: 'led', name: 'LED Lights', watts: 12, hours: 8, defaultQty: 6, factor: 'Sunlight (Solar W/m²)' },
+      { id: 'fridge', name: 'Refrigerator', watts: 160, hours: 24, defaultQty: 1, factor: 'Ambient Temp & Humidity' },
+      { id: 'ac', name: 'Air Conditioner', watts: 1400, hours: 6, defaultQty: 1, factor: 'Outdoor Temp & Humidity' },
+      { id: 'geyser', name: 'Water Heater', watts: 2000, hours: 2, defaultQty: 1, factor: 'Ambient Temp (Inlet)' },
+      { id: 'purifier', name: 'Air Purifier', watts: 50, hours: 12, defaultQty: 1, factor: 'Air Quality (PM2.5 / AQI)' },
+      { id: 'pump', name: 'Water Pump', watts: 750, hours: 1, defaultQty: 1, factor: 'Rain & Soil Moisture' },
+    ];
+
+    const state = {
+      view: 'devices',
+      quantities: Object.fromEntries(DEVICES.map((d) => [d.id, d.defaultQty])),
+      location: { name: 'Bengaluru', lat: 12.9716, lon: 77.5946 },
+      env: {
+        tempC: 25.0,
+        feelsC: 25.5,
+        humidity: 62,
+        solarWm2: 320,
+        isDay: true,
+        pm25: 18.0,
+        aqi: 64,
+        rainMm: 0.0,
+        soilMoisture: 0.25,
+        source: 'Default Profile',
+      },
+      analysis: null,
+    };
+
+    // =========================================================================
+    // NAVIGATION (4 TABS + 5TH REVEAL VIEW)
+    // =========================================================================
+    function switchView(targetView) {
+      const valid = ['devices', 'environment', 'compare', 'reveal'];
+      if (!valid.includes(targetView)) return;
+
+      state.view = targetView;
+      valid.forEach((v) => {
+        const sec = document.getElementById(`view-${v}`);
+        if (sec) sec.classList.toggle('hidden', v !== targetView);
+      });
+
+      // Highlight the corresponding top tab (4th tab stays active on reveal)
+      const activeTabId = targetView === 'reveal' ? 'tab-reveal' : `tab-${targetView}`;
+      ['devices', 'environment', 'compare', 'reveal'].forEach((t) => {
+        const btn = document.getElementById(`tab-${t}`);
+        if (!btn) return;
+        btn.className =
+          `tab-${t}` === activeTabId
+            ? 'tab-active shrink-0 rounded-xl px-3.5 py-2 text-xs font-bold transition sm:text-sm'
+            : 'tab-idle shrink-0 rounded-xl px-3.5 py-2 text-xs font-bold transition sm:text-sm';
+      });
+
+      if (targetView === 'compare' || targetView === 'reveal') {
+        recomputeComparison();
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function openFifthRevealInterface() {
+      recomputeComparison();
+      switchView('reveal');
+    }
+
+    function showStatus(msg, isWarn = false) {
+      const bar = document.getElementById('statusBar');
+      const dot = document.getElementById('statusDot');
+      const text = document.getElementById('statusText');
+      if (!bar || !dot || !text) return;
+      text.textContent = msg;
+      bar.classList.remove('hidden');
+      bar.classList.add('flex');
+      dot.className = isWarn ? 'h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400' : 'h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-400';
+    }
+
+    function hideStatus() {
+      const bar = document.getElementById('statusBar');
+      if (bar) {
+        bar.classList.add('hidden');
+        bar.classList.remove('flex');
+      }
+    }
+
+    // =========================================================================
+    // TAB 1: SELECT DEVICES
+    // =========================================================================
+    function renderDeviceCards() {
+      const grid = document.getElementById('deviceCardsGrid');
+      const totalEl = document.getElementById('totalUnitsCount');
+      if (!grid) return;
+
+      const totalUnits = DEVICES.reduce((sum, d) => sum + (state.quantities[d.id] || 0), 0);
+      if (totalEl) totalEl.textContent = String(totalUnits);
+
+      grid.innerHTML = DEVICES.map((d) => {
+        const qty = state.quantities[d.id] || 0;
+        const active = qty > 0;
+        return `
+          <div class="rounded-2xl border ${active ? 'border-emerald-500/40 bg-obsidian-850' : 'border-slate-800 bg-obsidian-950/70 opacity-80'} p-4 transition">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <h3 class="text-sm font-bold text-white">${d.name}</h3>
+                <p class="mt-0.5 font-mono text-[11px] text-slate-400">${d.watts}W · ${d.hours}h/day</p>
+              </div>
+              <span class="rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${active ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-slate-800 text-slate-400'}">
+                ${active ? 'Selected' : '0'}
+              </span>
+            </div>
+            <p class="mt-2 text-[11px] text-sky-300/90">Uses: ${d.factor}</p>
+
+            <div class="mt-4 flex items-center justify-between border-t border-slate-800 pt-3">
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  onclick="adjustQty('${d.id}', -1)"
+                  class="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700 bg-obsidian-900 text-sm font-bold text-slate-200 hover:bg-obsidian-800"
+                >−</button>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value="${qty}"
+                  onchange="setQty('${d.id}', this.value)"
+                  class="h-8 w-14 rounded-lg border border-slate-700 bg-obsidian-950 text-center font-mono text-sm font-bold text-white focus:border-emerald-400 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onclick="adjustQty('${d.id}', 1)"
+                  class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-sm font-extrabold text-slate-950 hover:bg-emerald-400"
+                >+</button>
+              </div>
+              <span class="font-mono text-xs text-slate-400">${((qty * d.watts * d.hours) / 1000).toFixed(2)} kWh std</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function adjustQty(id, delta) {
+      const cur = state.quantities[id] || 0;
+      state.quantities[id] = Math.max(0, Math.min(100, cur + delta));
+      renderDeviceCards();
+    }
+
+    function setQty(id, val) {
+      const parsed = parseInt(val, 10);
+      state.quantities[id] = Number.isNaN(parsed) ? 0 : Math.max(0, Math.min(100, parsed));
+      renderDeviceCards();
+    }
+
+    function resetDeviceQuantities() {
+      DEVICES.forEach((d) => {
+        state.quantities[d.id] = d.defaultQty;
+      });
+      renderDeviceCards();
+      showStatus('Reset appliance quantities to defaults.');
+    }
+
+    // =========================================================================
+    // TAB 2: ENVIRONMENT & EXTERNAL API
+    // =========================================================================
+    function pm25ToAqi(pm25) {
+      const v = Math.max(0, Number(pm25) || 0);
+      if (v <= 12) return Math.round((v / 12) * 50);
+      if (v <= 35.4) return Math.round(51 + ((v - 12.1) / 23.3) * 49);
+      if (v <= 55.4) return Math.round(101 + ((v - 35.5) / 19.9) * 49);
+      if (v <= 150.4) return Math.round(151 + ((v - 55.5) / 94.9) * 49);
+      return Math.min(400, Math.round(201 + ((v - 150.5) / 100) * 100));
+    }
+
+    function renderEnvironmentCards() {
+      const e = state.env;
+      document.getElementById('headerCityPill').textContent = state.location.name;
+      document.getElementById('envSourceBadge').textContent = e.source;
+      document.getElementById('envTempVal').textContent = `${e.tempC.toFixed(1)} °C`;
+      document.getElementById('envFeelsVal').textContent = `Feels like ${e.feelsC.toFixed(1)} °C`;
+      document.getElementById('envHumidityVal').textContent = `${Math.round(e.humidity)}%`;
+      document.getElementById('envSolarVal').textContent = `${Math.round(e.solarWm2)} W/m²`;
+      document.getElementById('envDaylightVal').textContent = e.isDay ? 'Daylight active' : 'Night / low sun';
+      document.getElementById('envAqiVal').textContent = `${e.aqi} AQI`;
+      document.getElementById('envPmVal').textContent = `PM2.5: ${e.pm25.toFixed(1)} µg/m³`;
+    }
+
+    async function pickCity(name, lat, lon) {
+      state.location = { name, lat, lon };
+      document.getElementById('citySearchInput').value = name;
+      await fetchEnvironmentData();
+    }
+
+    async function fetchEnvironmentData() {
+      const rawCity = (document.getElementById('citySearchInput')?.value || state.location.name).trim();
+      const btn = document.getElementById('fetchEnvBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Fetching...';
+      }
+
+      try {
+        let { name, lat, lon } = state.location;
+        if (rawCity && rawCity.toLowerCase() !== name.toLowerCase()) {
+          const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(rawCity)}&count=1&format=json`);
+          if (geoRes.ok) {
+            const geoJson = await geoRes.json();
+            if (geoJson.results && geoJson.results.length > 0) {
+              const hit = geoJson.results[0];
+              name = hit.name;
+              lat = hit.latitude;
+              lon = hit.longitude;
+              state.location = { name, lat, lon };
+            }
+          }
+        }
+
+        const wxUrl =
+          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+          `&current=temperature_2m,apparent_temperature,relative_humidity_2m,shortwave_radiation,is_day,precipitation,soil_moisture_0_to_1cm&timezone=auto`;
+        const aqUrl =
+          `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}` +
+          `&current=pm2_5&timezone=auto`;
+
+        const [wxRes, aqRes] = await Promise.all([fetch(wxUrl), fetch(aqUrl)]);
+        if (!wxRes.ok) throw new Error('Weather API failed');
+        const wxJson = await wxRes.json();
+        const cur = wxJson.current || {};
+
+        let pm25 = 18.0;
+        if (aqRes.ok) {
+          const aqJson = await aqRes.json();
+          if (aqJson.current?.pm2_5 != null) {
+            pm25 = Number(aqJson.current.pm2_5);
+          }
+        }
+
+        state.env = {
+          tempC: Number(cur.temperature_2m ?? 25),
+          feelsC: Number(cur.apparent_temperature ?? cur.temperature_2m ?? 25),
+          humidity: Number(cur.relative_humidity_2m ?? 60),
+          solarWm2: Number(cur.shortwave_radiation ?? 0),
+          isDay: Boolean(cur.is_day),
+          pm25,
+          aqi: pm25ToAqi(pm25),
+          rainMm: Number(cur.precipitation ?? 0),
+          soilMoisture: Number(cur.soil_moisture_0_to_1cm ?? 0.25),
+          source: 'Open-Meteo Live API',
+        };
+
+        renderEnvironmentCards();
+        showStatus(`Fetched live environmental data for ${state.location.name}.`);
+      } catch (err) {
+        state.env.source = 'Fallback Estimate';
+        renderEnvironmentCards();
+        showStatus(`Could not reach external API (${err.message}). Showing fallback environmental values.`, true);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Fetch API Data';
+        }
+      }
+    }
+
+    // =========================================================================
+    // TAB 3 & 4/5: COMPARE WITH STANDARD VALUE & REVEAL ANALYSIS
+    // =========================================================================
+    function computeMultiplier(deviceId, env) {
+      if (deviceId === 'led') {
+        if (!env.isDay || env.solarWm2 <= 15) return 1.0;
+        return Math.max(0.2, Math.min(1.0, 1 - env.solarWm2 / 700));
+      }
+      if (deviceId === 'fan') {
+        if (env.feelsC < 22) return 0.25;
+        return Math.max(0.45, Math.min(1.0, 0.45 + ((env.feelsC - 22) / 14) * 0.55));
+      }
+      if (deviceId === 'ac') {
+        if (env.tempC < 24 && env.humidity < 60) return 0.2;
+        const heatFactor = Math.max(0, (env.tempC - 24) / 14) * 0.4;
+        const humFactor = env.humidity > 72 ? 0.08 : 0;
+        return Math.max(0.35, Math.min(1.0, 0.52 + heatFactor + humFactor));
+      }
+      if (deviceId === 'fridge') {
+        const humAdj = env.humidity < 55 ? 0.85 : env.humidity > 78 ? 1.03 : 0.92;
+        const tempAdj = env.tempC < 22 ? 0.9 : env.tempC > 32 ? 1.04 : 0.96;
+        return Math.max(0.75, Math.min(1.0, humAdj * tempAdj));
+      }
+      if (deviceId === 'geyser') {
+        return Math.max(0.65, Math.min(1.0, 1 - 0.015 * (env.tempC - 20)));
+      }
+      if (deviceId === 'purifier') {
+        if (env.pm25 < 15) return 0.25;
+        if (env.pm25 >= 75) return 1.0;
+        return 0.25 + ((env.pm25 - 15) / 60) * 0.75;
+      }
+      if (deviceId === 'pump') {
+        if (env.rainMm > 1.5 || env.soilMoisture > 0.35) return 0.0;
+        return env.tempC > 30 ? 0.9 : 1.0;
+      }
+      return 0.9;
+    }
+
+    function buildReason(deviceId, env) {
+      if (deviceId === 'led') {
+        return env.isDay && env.solarWm2 > 15
+          ? `Daylight at ${Math.round(env.solarWm2)} W/m² allows LED dimming.`
+          : 'Low/no sunlight; LEDs run near standard brightness.';
+      }
+      if (deviceId === 'fan') {
+        return `Feels-like ${env.feelsC.toFixed(1)}°C & ${Math.round(env.humidity)}% RH adjust motor speed.`;
+      }
+      if (deviceId === 'ac') {
+        return env.tempC < 24 && env.humidity < 60
+          ? `Cool ${env.tempC.toFixed(1)}°C & ${Math.round(env.humidity)}% RH reduce compressor load.`
+          : `Scaled for ${env.tempC.toFixed(1)}°C outdoor temp and ${Math.round(env.humidity)}% humidity.`;
+      }
+      if (deviceId === 'fridge') {
+        return `Adjusted for ${Math.round(env.humidity)}% humidity and ${env.tempC.toFixed(1)}°C ambient.`;
+      }
+      if (deviceId === 'geyser') {
+        return `Ambient ${env.tempC.toFixed(1)}°C affects inlet water temperature.`;
+      }
+      if (deviceId === 'purifier') {
+        return `PM2.5 is ${env.pm25.toFixed(1)} µg/m³ (${env.aqi} AQI).`;
+      }
+      if (deviceId === 'pump') {
+        return env.rainMm > 1.5 || env.soilMoisture > 0.35
+          ? 'Moisture/rain detected; pump cycle skipped.'
+          : 'Dry soil; scheduled pump cycle active.';
+      }
+      return 'Environment-scaled operation.';
+    }
+
+    function recomputeComparison() {
+      const rows = DEVICES.map((d) => {
+        const qty = state.quantities[d.id] || 0;
+        const standardKwh = (qty * d.watts * d.hours) / 1000;
+        const mult = computeMultiplier(d.id, state.env);
+        const optimizedKwh = standardKwh * mult;
+        const savedKwh = Math.max(0, standardKwh - optimizedKwh);
+        return {
+          ...d,
+          qty,
+          standardKwh,
+          optimizedKwh,
+          savedKwh,
+          reason: buildReason(d.id, state.env),
+        };
+      });
+
+      const stdDaily = rows.reduce((s, r) => s + r.standardKwh, 0);
+      const optDaily = rows.reduce((s, r) => s + r.optimizedKwh, 0);
+      const savedDaily = Math.max(0, stdDaily - optDaily);
+      const savingsPct = stdDaily > 0 ? (savedDaily / stdDaily) * 100 : 0;
+
+      const tariff = 8.0; // ₹8 per kWh
+      const co2KgPerKwh = 0.82;
+
+      state.analysis = {
+        rows,
+        stdDaily,
+        optDaily,
+        savedDaily,
+        savingsPct,
+        stdMonthly: stdDaily * 30,
+        optMonthly: optDaily * 30,
+        savedMonthly: savedDaily * 30,
+        savedCostDaily: savedDaily * tariff,
+        savedCostMonthly: savedDaily * 30 * tariff,
+        savedCo2Daily: savedDaily * co2KgPerKwh,
+        savedCo2Monthly: savedDaily * 30 * co2KgPerKwh,
+      };
+
+      renderCompareView(state.analysis);
+      renderRevealView(state.analysis);
+    }
+
+    function runAnalysisAndGoCompare() {
+      recomputeComparison();
+      switchView('compare');
+    }
+
+    function renderCompareView(a) {
+      document.getElementById('compareContextLine').textContent =
+        `${state.location.name} · ${a.envTemp ?? state.env.tempC.toFixed(1)}°C, ${Math.round(state.env.humidity)}% RH, ${Math.round(state.env.solarWm2)} W/m², AQI ${state.env.aqi}`;
+
+      document.getElementById('stdDailyKwh').textContent = `${a.stdDaily.toFixed(2)} kWh`;
+      document.getElementById('stdMonthlyKwh').textContent = `${a.stdMonthly.toFixed(1)} kWh / month`;
+      document.getElementById('optDailyKwh').textContent = `${a.optDaily.toFixed(2)} kWh`;
+      document.getElementById('optMonthlyKwh').textContent = `${a.optMonthly.toFixed(1)} kWh / month`;
+      document.getElementById('savedDailyKwh').textContent = `${a.savedDaily.toFixed(2)} kWh`;
+      document.getElementById('savingsPctBadge').textContent = `${a.savingsPct.toFixed(1)}%`;
+      document.getElementById('savedCostEst').textContent = `₹${a.savedCostDaily.toFixed(2)} saved / day (@ ₹8/kWh)`;
+
+      const optWidth = a.stdDaily > 0 ? Math.max(0, Math.min(100, (a.optDaily / a.stdDaily) * 100)) : 0;
+      document.getElementById('stdBarText').textContent = `${a.stdDaily.toFixed(2)} kWh`;
+      document.getElementById('optBarText').textContent = `${a.optDaily.toFixed(2)} kWh (${a.savingsPct.toFixed(1)}% saved)`;
+      document.getElementById('stdBarFill').style.width = a.stdDaily > 0 ? '100%' : '0%';
+      document.getElementById('optBarFill').style.width = `${optWidth}%`;
+
+      const tbody = document.getElementById('compareTableBody');
+      tbody.innerHTML = a.rows
+        .map(
+          (r) => `
+          <tr class="${r.qty === 0 ? 'opacity-50' : ''}">
+            <td class="px-4 py-3 font-sans font-bold text-white">${r.name}</td>
+            <td class="px-4 py-3 text-slate-300">${r.qty}</td>
+            <td class="px-4 py-3 text-slate-300">${r.standardKwh.toFixed(2)}</td>
+            <td class="px-4 py-3 text-emerald-300">${r.optimizedKwh.toFixed(2)}</td>
+            <td class="px-4 py-3 font-bold text-emerald-400">-${r.savedKwh.toFixed(2)}</td>
+          </tr>
+        `
+        )
+        .join('');
+    }
+
+    function renderRevealView(a) {
+      document.getElementById('revealHeadline').textContent =
+        `For ${state.location.name} (${state.env.source}) — Standard ${a.stdDaily.toFixed(2)} kWh/day reduced to Optimal ${a.optDaily.toFixed(2)} kWh/day.`;
+      document.getElementById('revealSavedDaily').textContent = `${a.savedDaily.toFixed(2)} kWh`;
+      document.getElementById('revealSavedPct').textContent = `${a.savingsPct.toFixed(1)}% below standard`;
+      document.getElementById('revealSavedMonthly').textContent = `${a.savedMonthly.toFixed(1)} kWh`;
+      document.getElementById('revealBillMonthly').textContent = `₹${a.savedCostMonthly.toFixed(0)}`;
+      document.getElementById('revealBillDaily').textContent = `₹${a.savedCostDaily.toFixed(2)} / day`;
+      document.getElementById('revealCo2Monthly').textContent = `${a.savedCo2Monthly.toFixed(1)} kg`;
+      document.getElementById('revealCo2Daily').textContent = `${a.savedCo2Daily.toFixed(2)} kg / day`;
+
+      const activeRows = a.rows.filter((r) => r.qty > 0);
+      const listEl = document.getElementById('revealInsightsList');
+      if (!activeRows.length) {
+        listEl.innerHTML = `<div class="rounded-2xl border border-slate-800 bg-obsidian-950/80 p-4 text-xs text-slate-400">No devices selected. Go to Select Devices to add appliances.</div>`;
+        return;
+      }
+
+      listEl.innerHTML = activeRows
+        .map(
+          (r) => `
+          <div class="rounded-2xl border border-slate-800 bg-obsidian-950/85 p-4">
+            <div class="flex items-center justify-between gap-2">
+              <div class="text-sm font-bold text-white">${r.name} <span class="font-mono text-xs text-slate-400">×${r.qty}</span></div>
+              <span class="rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2.5 py-0.5 font-mono text-xs font-bold text-emerald-300">
+                -${r.savedKwh.toFixed(2)} kWh/day
+              </span>
+            </div>
+            <div class="mt-2 font-mono text-xs text-slate-400">
+              Standard: <span class="text-slate-200">${r.standardKwh.toFixed(2)} kWh</span> → Optimal: <span class="text-emerald-300">${r.optimizedKwh.toFixed(2)} kWh</span>
+            </div>
+            <p class="mt-2 text-xs text-slate-300">${r.reason}</p>
+          </div>
+        `
+        )
+        .join('');
+    }
+
+    // =========================================================================
+    // INITIALIZATION
+    // =========================================================================
+
+// ============================================
+// FIREBASE DATABASE CONNECTION
+// ============================================
+
+// Give this browser a persistent demo session ID.
+// This is not user authentication.
+function getSessionId() {
+    let sessionId = localStorage.getItem("energyOptimizerSession");
+
+    if (!sessionId) {
+        if (window.crypto && typeof window.crypto.randomUUID === "function") {
+            sessionId = window.crypto.randomUUID();
+        } else {
+            sessionId = "session_" + Date.now() + "_" + Math.random().toString(36).slice(2);
+        }
+        localStorage.setItem("energyOptimizerSession", sessionId);
+    }
+
+    return sessionId;
+}
+
+function collectSelectedDevices() {
+    return DEVICES.map(device => ({
+        deviceId: device.id,
+        deviceName: device.name,
+        quantity: Number(state.quantities[device.id]) || 0
+    }));
+}
+
+// Read a response body once and parse JSON safely.
+async function readApiResponse(response) {
+    const responseText = await response.text();
+    console.log("API response status:", response.status);
+    console.log("API response body:", responseText);
+
+    let result = {};
+    if (responseText.trim()) {
+        try {
+            result = JSON.parse(responseText);
+        } catch (error) {
+            throw new Error("The server returned invalid JSON: " + responseText);
+        }
+    }
+
+    if (!response.ok) {
+        throw new Error(result.error || `Request failed with HTTP ${response.status}`);
+    }
+
+    if (!responseText.trim()) {
+        throw new Error(`The server returned an empty response (HTTP ${response.status}).`);
+    }
+
+    return result;
+}
+
+// SAVE quantities to Firestore through the Node.js backend.
+async function saveDeviceSelections() {
+    try {
+        showStatus("Saving appliance selections...");
+
+        const response = await fetch("/api/save-devices", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                sessionId: getSessionId(),
+                devices: collectSelectedDevices()
+            })
+        });
+
+        const result = await readApiResponse(response);
+
+        if (result.success) {
+            showStatus(result.message || "Appliance quantities saved successfully!");
+        } else {
+            throw new Error(result.error || "The server did not confirm that the data was saved.");
+        }
+    } catch (error) {
+        console.error("Save error:", error);
+        showStatus("Unable to save selections: " + error.message, true);
+    }
+}
+
+// LOAD previously saved quantities from Firestore.
+async function loadDeviceSelections() {
+    try {
+        const response = await fetch(
+            `/api/load-devices/${encodeURIComponent(getSessionId())}`
+        );
+        const result = await readApiResponse(response);
+
+        if (result.quantities && Object.keys(result.quantities).length > 0) {
+            DEVICES.forEach(device => {
+                state.quantities[device.id] = Number(result.quantities[device.id]) || 0;
+            });
+            showStatus("Previously saved appliance selections loaded.");
+        }
+    } catch (error) {
+        console.error("Load error:", error);
+        showStatus("Could not load saved selections. Using default quantities. " + error.message, true);
+    }
+}
+
+// Initialize the page after saved quantities have been loaded.
+window.addEventListener("DOMContentLoaded", async () => {
+    await loadDeviceSelections();
+    renderDeviceCards();
+    renderEnvironmentCards();
+    recomputeComparison();
+    fetchEnvironmentData();
+});
+
+  </script>
+</body>
+</html>
