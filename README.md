@@ -128,7 +128,7 @@ Allow location access when prompted to retrieve environmental information for yo
 ![Dashboard](screenshots/select_devices.png)
 
 ## Environment Monitoring 
-![Environment Monitoring](screenshots/Inputfectching.png)
+![Environment Monitoring](screenshots/Inputfetching.png)
 
 ## Analysis
 ![Analysis](screenshots/analysis.png) 
