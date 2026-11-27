@@ -125,7 +125,16 @@ Allow location access when prompted to retrieve environmental information for yo
 ## Application Screenshots
 
 ## Dashboard
-![Dashboard](screenshots/dashboard.png)
+![Dashboard](screenshots/select_devices.png)
+
+## Environment Monitoring 
+![Environment Monitoring](screenshots/Inputfectching.png)
+
+## Analysis
+![Analysis](screenshots/analysis.png) 
+
+## Reveal Analysis
+![Reveal Analysis](screenshots/reveal_analysis.png)
 
 ## API Endpoints
 
