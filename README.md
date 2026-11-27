@@ -19,6 +19,33 @@ The application combines appliance information with real-time environmental data
 - **Environment-Based Comparison** – Compare estimated energy usage under current environmental conditions.
 - **Firebase Integration** – Save and retrieve appliance selections using Cloud Firestore.
 
+
+
+
+## System Architecture
+
+```mermaid
+flowchart TD
+    A[User] --> B[Frontend]
+    B --> C[Node.js and Express Backend]
+    C --> D[Firebase Firestore]
+    C --> E[Open-Meteo Weather API]
+    C --> F[Open-Meteo Air Quality API]
+    D --> G[Stored Appliance Data]
+    E --> H[Environmental Data]
+    F --> H
+    G --> I[Energy Analysis]
+    H --> I
+    I --> J[Energy Consumption Results]
+    I --> K[Environmental Impact]
+    I --> L[Appliance Comparison]
+    J --> M[Dashboard]
+    K --> M
+    L --> M
+```
+
+
+
 ## Technologies Used
 
 | Technology | Purpose |
